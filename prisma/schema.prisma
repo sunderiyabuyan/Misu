@@ -1,0 +1,203 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum ProductCategory {
+  LENSE
+  FRAME
+  SUNGLASS
+  EYEDROPS
+  READING_GLASSES
+  CONTACT_LENSES
+  ACCESSORIES
+  OTHERS
+}
+
+enum ProductStatus {
+  IN_STOCK
+  OUT_OF_STOCK
+  DISCONTINUED
+}
+
+enum OrderStatus {
+  PENDING
+  MATERIALS_NEEDED
+  READY_FOR_PICKUP
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id          Int      @id @default(autoincrement()) @map("id")
+  firstName   String   @map("first_name")
+  lastName    String   @map("last_name")
+  userRole    UserRole @default(USER)
+  phoneNumber String   @unique
+  email       String   @unique
+  password    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  managingStores Store[] @relation("StoreUser")
+
+  @@map("users")
+}
+
+model Store {
+  id        Int      @id @default(autoincrement()) @map("id")
+  userId    Int      @map("user_id")
+  name      String
+  address   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  storeUser   User             @relation("StoreUser", fields: [userId], references: [id])
+  inventories StoreInventory[]
+  orders      Order[]
+  customers   Customer[]
+
+  @@map("stores")
+}
+
+model StoreInventory {
+  id           Int      @id @default(autoincrement())
+  storeId      Int
+  productId    Int?
+  lensDetailId Int?
+  quantity     Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  store      Store       @relation(fields: [storeId], references: [id])
+  product    Product?    @relation(fields: [productId], references: [id])
+  lensDetail LensDetail? @relation(fields: [lensDetailId], references: [id])
+
+  @@unique([storeId, productId, lensDetailId])
+  @@index([storeId])
+  @@index([productId])
+  @@index([lensDetailId])
+  @@map("store_inventories")
+}
+
+model Product {
+  id          Int             @id @default(autoincrement()) @map("id")
+  name        String
+  sku         String          @unique
+  brand       String
+  category    ProductCategory
+  description String?
+  costPrice   Decimal         @db.Decimal(10, 2)
+  retailPrice Decimal         @db.Decimal(10, 2)
+  status      ProductStatus   @default(IN_STOCK)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  inventories StoreInventory[]
+  lensDetail  LensDetail[]
+  orderItems  OrderItem[]
+
+  @@index([category])
+  @@index([status])
+  @@map("products")
+}
+
+model LensDetail {
+  id        Int      @id @default(autoincrement())
+  productId Int
+  sphere    Decimal? @db.Decimal(4, 2)
+  cylinder  Decimal? @db.Decimal(4, 2)
+  axis      Int?
+  addition  Decimal? @db.Decimal(4, 2)
+  baseCurve Decimal? @db.Decimal(4, 2)
+  diameter  Decimal? @db.Decimal(4, 1)
+  coating   String?
+  material  String?
+  type      String?
+
+  product     Product          @relation(fields: [productId], references: [id])
+  inventories StoreInventory[]
+  orderItems  OrderItem[]
+
+  @@map("lens_details")
+}
+
+model Order {
+  id            Int         @id @default(autoincrement())
+  storeId       Int
+  customerId    Int?
+  orderDate     DateTime    @default(now())
+  totalPrice    Decimal     @db.Decimal(10, 2)
+  status        OrderStatus @default(PENDING)
+  staffInCharge String
+  staffNotes    String?
+
+  store    Store       @relation(fields: [storeId], references: [id])
+  customer Customer?   @relation(fields: [customerId], references: [id])
+  items    OrderItem[]
+
+  @@index([storeId])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id           Int      @id @default(autoincrement())
+  orderId      Int
+  productId    Int?
+  lensDetailId Int?
+  quantity     Int
+  unitPrice    Decimal  @db.Decimal(10, 2)
+  totalPrice   Decimal  @db.Decimal(10, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  order      Order       @relation(fields: [orderId], references: [id])
+  product    Product?    @relation(fields: [productId], references: [id])
+  lensDetail LensDetail? @relation(fields: [lensDetailId], references: [id])
+
+  @@map("order_items")
+}
+
+model Customer {
+  id          Int      @id @default(autoincrement()) @map("id")
+  name        String
+  phoneNumber String   @unique
+  email       String?  @unique
+  storeId     Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store    Store     @relation(fields: [storeId], references: [id])
+  orders   Order[]
+  eyeTests EyeTest[]
+
+  @@map("customers")
+}
+
+model EyeTest {
+  id                Int      @id @default(autoincrement()) @map("id")
+  customerId        Int
+  testDate          DateTime @default(now())
+  rightSphere       Decimal? @db.Decimal(4, 2)
+  rightCylinder     Decimal? @db.Decimal(4, 2)
+  rightAxis         Int?
+  leftSphere        Decimal? @db.Decimal(4, 2)
+  leftCylinder      Decimal? @db.Decimal(4, 2)
+  leftAxis          Int?
+  rightAddition     Decimal? @db.Decimal(4, 2)
+  leftAddition      Decimal? @db.Decimal(4, 2)
+  pupillaryDistance Decimal? @db.Decimal(5, 2)
+  notes             String?
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@map("eye_tests")
+}
