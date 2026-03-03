@@ -1,190 +1,295 @@
-import { prisma } from '../src/config/prisma.js';
-import { ProductCategory } from '@prisma/client';
-
+import { prisma } from "../src/config/prisma.js";
+import { ProductCategory, UserRole } from "@prisma/client";
 import bcrypt from "bcrypt";
 
 async function main() {
-  console.log("Seeding database");
-
   await clearDatabase();
 
-  // Create users
+  // Admin (platform-level)
   const admin = await createAdmin();
-  const storeUser = await createStoreUser("Misu", "Optics");
 
-  // Create stores
-  const store1 = await createStore(storeUser.id, "Misu Optics - Yarmag", "Yarmag");
-  const store2 = await createStore(storeUser.id, "Misu Optics - Tara", "Tara");
+  // Business owner
+  const owner = await createOwner("Misu", "Optics");
 
-  // Create products
-  const frame1 = await createProduct("Raybans Black Frame", "MIS123456", "Rayban", ProductCategory.FRAME, 20.0, 50.0);
-  const frame2 = await createProduct("GentleMonster Frame", "MIS342356", "Gentle Monster", ProductCategory.FRAME, 25.0, 90.0);
-  const lens1 = await createProduct("Single Vision Lens", "MIS987654", "Essilor", ProductCategory.LENSE, 15.0, 40.0);
-  const lens2 = await createProduct("Progressive Lens", "MIS456789", "Hoya", ProductCategory.LENSE, 30.0, 80.0);
-  const accessory1 = await createProduct("Cleaning Cloth", "MIS112233", "OptiClean", ProductCategory.ACCESSORIES, 5.0, 10.0);
-  const accessory2 = await createProduct("Eyeglass Case", "MIS445566", "CaseMate", ProductCategory.ACCESSORIES, 8.0, 16.0);
-  const contactLens1 = await createProduct("Daily Contact Lenses", "MIS778899", "Acuvue", ProductCategory.CONTACT_LENSES, 5.0, 12.0);
-  const randomProduct = await createProduct("Random Product", "MIS000000", "RandomBrand", ProductCategory.OTHERS, 10.0, 20.0);
+
+  // Business
+  const business = await createBusiness("Misu Optics", owner.id);
+
+
   
+  // Attach owner to business
+  await prisma.user.update({
+    where: { id: owner.id },
+    data: { businessId: business.id },
+  });
+
+  const staff1 = await prisma.user.create({
+    data: {
+      firstName: "Alice",
+      lastName: "Staff",
+      email: "alice@misuoptics.com",
+      phoneNumber: "0400000002",
+      password: await bcrypt.hash("Staff123$", 10),
+      userRole: "STAFF",
+      businessId: business.id,
+    },
+  });
   
+  const staff2 = await prisma.user.create({
+    data: {
+      firstName: "Bob",
+      lastName: "Staff",
+      email: "bob@misuoptics.com",
+      phoneNumber: "0400000003",
+      password: await bcrypt.hash("Staff123$", 10),
+      userRole: "STAFF",
+      businessId: business.id,
+    },
+  });
 
-  // Create lens specifications
-  const singleVisionVariants = await Promise.all([
-    createLensSpecification(lens1.id, -1.00, -0.50, 180, null, 4.00, 70.0, "UV & AR Coating", "Plastic", "Single Vision"),
-    createLensSpecification(lens1.id, -1.25, -0.75, 180, null, 4.00, 70.0, "UV & AR Coating", "Plastic", "Single Vision"),
-    createLensSpecification(lens1.id, -2.00, -1.00, 170, null, 4.25, 72.0, "UV & AR Coating", "Plastic", "Single Vision")
-  ]);
+  // Stores
+  const store1 = await createStore(
+    business.id,
+    "Misu Optics - Yarmag",
+    "Yarmag"
+  );
+  const store2 = await createStore(
+    business.id,
+    "Misu Optics - Tara",
+    "Tara"
+  );
 
-  const progressiveVariants = await Promise.all([
-    createLensSpecification(lens2.id, +1.50, -0.75, 170, +2.00, 5.00, 72.0, "Blue Light Filter", "High-Index 1.67", "Progressive"),
-    createLensSpecification(lens2.id, +2.00, -0.50, 160, +2.25, 5.00, 70.0, "Blue Light Filter", "High-Index 1.67", "Progressive")
-  ]);
+  await prisma.store.update({
+    where: { id: store1.id },
+    data: {
+      staff: {
+        connect: [{ id: staff1.id }],
+      },
+    },
+  });
+  
+  await prisma.store.update({
+    where: { id: store2.id },
+    data: {
+      staff: {
+        connect: [{ id: staff2.id }],
+      },
+    },
+  });
+  
+  // Products
+  const frame1 = await createProduct(
+    business.id,
+    "Raybans Black Frame",
+    "MIS123456",
+    "Rayban",
+    ProductCategory.FRAME,
+    20,
+    50
+  );
 
-  // Inventory per store (linking both product and lens variants)
-  await Promise.all([
-    // Store 1 — mix of frames and lenses
-    createStoreInventory(store1.id, frame1.id, null, 10),
-    createStoreInventory(store1.id, frame2.id, null, 5),
-    createStoreInventory(store1.id, null, singleVisionVariants[0].id, 12),
-    createStoreInventory(store1.id, null, progressiveVariants[0].id, 6),
+  const frame2 = await createProduct(
+    business.id,
+    "GentleMonster Frame",
+    "MIS342356",
+    "Gentle Monster",
+    ProductCategory.FRAME,
+    25,
+    90
+  );
 
-    // Store 2 — some other mix
-    createStoreInventory(store2.id, frame2.id, null, 8),
-    createStoreInventory(store2.id, null, singleVisionVariants[1].id, 10),
-    createStoreInventory(store2.id, null, progressiveVariants[1].id, 4),
-    createStoreInventory(store2.id, accessory1.id, null, 20),
-    createStoreInventory(store2.id, contactLens1.id, null, 15)
-  ]);
+  const lens1 = await createProduct(
+    business.id,
+    "Single Vision Lens",
+    "MIS987654",
+    "Essilor",
+    ProductCategory.LENSE,
+    15,
+    40
+  );
 
-  const customer = await CreateCustomer('Hwang Soyoon', '99190495', 'sonder1199@gmail.com',store1.id );
+  const lens2 = await createProduct(
+    business.id,
+    "Progressive Lens",
+    "MIS456789",
+    "Hoya",
+    ProductCategory.LENSE,
+    30,
+    80
+  );
 
-  const eyeTest = await CreateEyeTest(customer.id, -1, -1, 2, 2, 0.5, 0.5, 0, 'Wear glasses regularly');
+  const accessory = await createProduct(
+    business.id,
+    "Cleaning Cloth",
+    "MIS112233",
+    "OptiClean",
+    ProductCategory.ACCESSORIES,
+    5,
+    10
+  );
 
-  const order1 = await prisma.order.create({
+  // Lens variants
+  const singleVision = await createLensDetail(
+    lens1.id,
+    -1.0,
+    -0.5,
+    180,
+    null,
+    4.0,
+    70,
+    "AR Coating",
+    "Plastic",
+    "Single Vision"
+  );
+
+  const progressive = await createLensDetail(
+    lens2.id,
+    1.5,
+    -0.75,
+    170,
+    2.0,
+    5.0,
+    72,
+    "Blue Light",
+    "High Index",
+    "Progressive"
+  );
+
+  // Inventory
+  await createStoreInventory(store1.id, frame1.id, null, 10);
+  await createStoreInventory(store1.id, null, singleVision.id, 12);
+  await createStoreInventory(store2.id, frame2.id, null, 8);
+  await createStoreInventory(store2.id, null, progressive.id, 6);
+  await createStoreInventory(store2.id, accessory.id, null, 20);
+
+  // Customer
+  const customer = await createCustomer(
+    business.id,
+    store1.id,
+    "Hwang Soyoon",
+    "99190495",
+    "sonder1199@gmail.com"
+  );
+
+  // Eye test
+  await createEyeTest(customer.id, -1, -1, 2, 2, 0.5, 0.5, 0, "Regular wear");
+
+  // Order
+  await prisma.order.create({
     data: {
       storeId: store1.id,
       customerId: customer.id,
-      totalPrice: 260.00,
-      staffInCharge: "Misu Optics - Yarmag Staff",
-      staffNotes: "Frame and lens fitting completed.",
+      totalPrice: 260,
+      staffInCharge: "Yarmag Staff",
       items: {
         create: [
           {
-            productId: frame1.id, // frame
+            productId: frame1.id,
             quantity: 1,
-            unitPrice: 120.0,
-            totalPrice: 120.0,
+            unitPrice: 120,
+            totalPrice: 120,
           },
           {
-            lensDetailId: singleVisionVariants[0].id, // specific lens variant
+            lensDetailId: singleVision.id,
             quantity: 2,
-            unitPrice: 70.0,
-            totalPrice: 140.0,
+            unitPrice: 70,
+            totalPrice: 140,
           },
         ],
       },
     },
   });
-
-  const order2 = await prisma.order.create({
-    data: {
-      storeId: store2.id,
-      customerId: customer.id,
-      totalPrice: 210.00,
-      staffInCharge: "Misu Optics - Tara Staff",
-      staffNotes: "Progressive lens with case.",
-      items: {
-        create: [
-          {
-            lensDetailId: progressiveVariants[0].id,
-            quantity: 1,
-            unitPrice: 150.0,
-            totalPrice: 150.0,
-          },
-          {
-            productId: accessory2.id, // eyeglass case
-            quantity: 1,
-            unitPrice: 60.0,
-            totalPrice: 60.0,
-          },
-        ],
-      },
-    },
-  });
-
-  console.log("Database seeded successfully!");
 }
 
-// Clear old data
 async function clearDatabase() {
   await prisma.orderItem.deleteMany();
-  await prisma.storeInventory.deleteMany();
   await prisma.order.deleteMany();
+  await prisma.storeInventory.deleteMany();
   await prisma.lensDetail.deleteMany();
   await prisma.product.deleteMany();
   await prisma.eyeTest.deleteMany();
   await prisma.customer.deleteMany();
   await prisma.store.deleteMany();
+  await prisma.business.deleteMany();
   await prisma.user.deleteMany();
 }
 
-// Admin
 async function createAdmin() {
-  const hashedPassword = await bcrypt.hash("Mishka0525$", 10);
   return prisma.user.create({
     data: {
       firstName: "Sunderiya",
       lastName: "Admin",
-      userRole: "ADMIN",
-      email: "sunderiyabuyan@gmail.com",
-      phoneNumber: "+610451711996",
-      password: hashedPassword
-    }
+      email: "admin@misu.app",
+      phoneNumber: "+61000000001",
+      password: await bcrypt.hash("Admin123$", 10),
+      userRole: UserRole.ADMIN,
+    },
   });
 }
 
-// Store User
-async function createStoreUser(firstName: string, lastName: string) {
-  const hashedPassword = await bcrypt.hash("StoreUser123$", 10);
+async function createOwner(firstName: string, lastName: string) {
   return prisma.user.create({
     data: {
       firstName,
       lastName,
-      userRole: "USER",
-      email: `${firstName.toLowerCase()}@misuoptics.com`,
-      phoneNumber: "+610400000000",
-      password: hashedPassword
-    }
+      email: "owner@misuoptics.com",
+      phoneNumber: "+61000000002",
+      password: await bcrypt.hash("Owner123$", 10),
+      userRole: UserRole.OWNER,
+    },
   });
 }
 
-//  Store
-async function createStore(userId: number, name: string, address: string) {
+
+async function createBusiness(name: string, ownerId: number) {
+  return prisma.business.create({
+    data: {
+      name,
+      ownerId,
+    },
+  });
+}
+
+
+
+async function createStore(
+  businessId: number,
+  name: string,
+  address: string
+) {
   return prisma.store.create({
     data: {
-      userId,
+      businessId,
       name,
-      address
-    }
+      address,
+    },
   });
 }
 
-//  Product
-async function createProduct(name: string, sku: string, brand: string, category: ProductCategory, costPrice: number, retailPrice: number) {
+
+async function createProduct(
+  businessId: number,
+  name: string,
+  sku: string,
+  brand: string,
+  category: ProductCategory,
+  costPrice: number,
+  retailPrice: number
+) {
   return prisma.product.create({
     data: {
+      businessId,
       name,
       sku,
       brand,
       category,
       costPrice,
-      retailPrice
-    }
+      retailPrice,
+    },
   });
 }
 
-//  Lens Specification (LensDetail)
-async function createLensSpecification(
+async function createLensDetail(
   productId: number,
   sphere: number | null,
   cylinder: number | null,
@@ -207,69 +312,75 @@ async function createLensSpecification(
       diameter,
       coating,
       material,
-      type
-    }
+      type,
+    },
   });
 }
 
-// Store Inventory
-async function createStoreInventory(storeId: number, productId: number | null, lensDetailId: number | null, quantity: number) {
+async function createStoreInventory(
+  storeId: number,
+  productId: number | null,
+  lensDetailId: number | null,
+  quantity: number
+) {
   return prisma.storeInventory.create({
     data: {
       storeId,
       productId,
       lensDetailId,
-      quantity
-    }
+      quantity,
+    },
   });
 }
 
-async function CreateCustomer(name: string, phoneNumber: string, email: string, storeId: number) {
+async function createCustomer(
+  businessId: number,
+  storeId: number,
+  name: string,
+  phoneNumber: string,
+  email: string
+) {
   return prisma.customer.create({
     data: {
+      businessId,
+      storeId,
       name,
       phoneNumber,
       email,
-      storeId
-    }
+    },
   });
 }
 
-async function CreateEyeTest(
-    customerId: number,
-    rightSphere: number,
-    leftSphere: number,
-    rightCylinder: number,
-    leftCylinder: number,
-    rightAddition: number,
-    leftAddition: number,
-    pupillaryDistance: number,
-    notes: string
-  ) {
-    return prisma.eyeTest.create({
-      data: {
-        customerId,
-        rightSphere,
-        leftSphere,
-        rightCylinder,
-        leftCylinder,
-        rightAddition,
-        leftAddition,
-        pupillaryDistance,
-        notes
-      }
-    });
-  }
-  
+async function createEyeTest(
+  customerId: number,
+  rightSphere: number,
+  leftSphere: number,
+  rightCylinder: number,
+  leftCylinder: number,
+  rightAddition: number,
+  leftAddition: number,
+  pupillaryDistance: number,
+  notes: string
+) {
+  return prisma.eyeTest.create({
+    data: {
+      customerId,
+      rightSphere,
+      leftSphere,
+      rightCylinder,
+      leftCylinder,
+      rightAddition,
+      leftAddition,
+      pupillaryDistance,
+      notes,
+    },
+  });
+}
 
-
-// Run seeding
 main()
-  .then(async () => {
-    await prisma.$disconnect()
-  })
+  .then(() => prisma.$disconnect())
   .catch(async (e) => {
-    console.error(e)
-    await prisma.$disconnect()
-    process.exit(1)
-  })
+    console.error(e);
+    await prisma.$disconnect();
+    process.exit(1);
+  });

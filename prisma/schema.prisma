@@ -1,14 +1,16 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
+
 
 datasource db {
   provider = "mysql"
 }
+
 enum UserRole {
   ADMIN
-  USER
+  OWNER
+  STAFF
 }
 
 enum ProductCategory {
@@ -36,37 +38,67 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum OperationStatus{
+  ACTIVE
+  INACTIVE
+}
+
 model User {
   id          Int      @id @default(autoincrement()) @map("id")
   firstName   String   @map("first_name")
   lastName    String   @map("last_name")
-  userRole    UserRole @default(USER)
-  phoneNumber String   @unique
+  userRole    UserRole @default(STAFF)
   email       String   @unique
+  phoneNumber String   @unique
   password    String
+  businessId  Int?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  managingStores Store[] @relation("StoreUser")
+  business         Business? @relation("BusinessUsers", fields: [businessId], references: [id])
+  ownedBusiness    Business? @relation("BusinessOwner")
+  storeAssignments Store[]   @relation("StoreStaff")
 
   @@map("users")
 }
 
-model Store {
-  id        Int      @id @default(autoincrement()) @map("id")
-  userId    Int      @map("user_id")
-  name      String
-  address   String
+model Business {
+  id        Int      @id @default(autoincrement())
+  name      String   @map("business_name")
+  ownerId   Int      @unique
+  status    OperationStatus  @default(ACTIVE)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  storeUser   User             @relation("StoreUser", fields: [userId], references: [id])
+  owner    User      @relation("BusinessOwner", fields: [ownerId], references: [id])
+  users    User[]    @relation("BusinessUsers")
+  stores   Store[]
+  products Product[]
+  customers Customer[]
+
+  @@map("businesses")
+}
+
+model Store {
+  id         Int      @id @default(autoincrement())
+  businessId Int
+  name       String
+  address    String
+  status     OperationStatus @default(ACTIVE)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id])
+  staff    User[]   @relation("StoreStaff")
+
+  customers   Customer[]
   inventories StoreInventory[]
   orders      Order[]
-  customers   Customer[]
 
+  @@index([businessId])
   @@map("stores")
 }
+
 
 model StoreInventory {
   id           Int      @id @default(autoincrement())
@@ -89,6 +121,7 @@ model StoreInventory {
 
 model Product {
   id          Int             @id @default(autoincrement()) @map("id")
+  businessId  Int
   name        String
   sku         String          @unique
   brand       String
@@ -100,6 +133,7 @@ model Product {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
+  business    Business         @relation(fields: [businessId], references: [id])
   inventories StoreInventory[]
   lensDetail  LensDetail[]
   orderItems  OrderItem[]
@@ -167,20 +201,25 @@ model OrderItem {
 }
 
 model Customer {
-  id          Int      @id @default(autoincrement()) @map("id")
+  id          Int      @id @default(autoincrement())
   name        String
   phoneNumber String   @unique
   email       String?  @unique
   storeId     Int
+  businessId  Int
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  store    Store     @relation(fields: [storeId], references: [id])
+  business Business @relation(fields: [businessId], references: [id])
+  store    Store    @relation(fields: [storeId], references: [id])
   orders   Order[]
   eyeTests EyeTest[]
 
+  @@index([businessId])
+  @@index([storeId])
   @@map("customers")
 }
+
 
 model EyeTest {
   id                Int      @id @default(autoincrement()) @map("id")

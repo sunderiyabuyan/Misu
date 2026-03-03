@@ -39,6 +39,7 @@ export interface TokenResponse {
 export interface JWTTokenPayload {
     userId: number;
     userRole: UserRole;
+    businessId?: number | null,
     iat: number;
     exp?: number;
 }

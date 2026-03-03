@@ -107,8 +107,8 @@ export class UserController {
             return;
         }
 
-        const {currentPassword, newPassword} = req.body;
-        const result = await UserService.updatePassword(userId, currentPassword, newPassword)
+        const {oldPassword, newPassword} = req.body;
+        const result = await UserService.updatePassword(userId, oldPassword, newPassword)
 
         res.status(200).json({
             success: true,
@@ -154,37 +154,38 @@ export class UserController {
         }
     }
 
-    static async deleteUser (req: Request, res: Response): Promise<void>{
-        try{
-            const userId = req.user?.userId;
-            if(!userId){
-                res.status(401).json({
-                    success: false,
-                    message: "Unathorised"
-                });
-                return;
-            }
-
-            const userData = await UserService.deleteUser(userId);
-
-            res.status(201).json({
-                success: true,
-                data: userData
+    static async deleteUser(req: Request, res: Response): Promise<void> {
+        try {
+          const id = Number(req.params.id);
+      
+          if (isNaN(id)) {
+            res.status(400).json({
+              success: false,
+              message: "Invalid user ID",
             });
-        }catch(error){
-            console.error("Error Deleting Profile: ", error);
-
-            res.status(500).json({
-                success: false,
-                message: error instanceof Error ? error.message : "Unknown error",
-                error: process.env.NODE_ENV !== "production" ? String(error) : undefined
-            });
+            return;
+          }
+      
+          const result = await UserService.deleteUser(id);
+      
+          res.status(200).json({
+            success: true,
+            data: result,
+          });
+        } catch (error) {
+          console.error("Error deleting user:", error);
+      
+          res.status(500).json({
+            success: false,
+            message: error instanceof Error ? error.message : "Unknown error",
+          });
         }
-    }
+      }
+      
 
     static async getAllUser(req: Request, res: Response) : Promise<void>{
         try{
-            const users = await UserService.GetAllUsers;
+            const users = await UserService.GetAllUsers();
 
             res.status(201).json({
                 success: true,

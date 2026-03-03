@@ -12,12 +12,14 @@ router.get('/profile', requireAuth,UserController.getUserProfile);
 
 router.put('/profile-update', requireAuth, validate(updateUserSchema), UserController.updateUser);
 
+router.get('/users', requireAuth, authorizedRoles(UserRole.ADMIN), UserController.getAllUser);
+
 router.get('/:id', requireAuth, authorizedRoles(UserRole.ADMIN),UserController.getUserById)
 
 router.put('/update-password', requireAuth, validate(updatePasswordSchema), UserController.updatePassword);
 
 router.delete('/:id', requireAuth, authorizedRoles(UserRole.ADMIN), UserController.deleteUser);
 
-router.get('/users', requireAuth, authorizedRoles(UserRole.ADMIN), UserController.getAllUser);
+
 
 export default router;

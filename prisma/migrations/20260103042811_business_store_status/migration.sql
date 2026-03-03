@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE `businesses` ADD COLUMN `status` ENUM('ACTIVE', 'INACTIVE') NOT NULL DEFAULT 'ACTIVE';
+
+-- AlterTable
+ALTER TABLE `stores` ADD COLUMN `status` ENUM('ACTIVE', 'INACTIVE') NOT NULL DEFAULT 'ACTIVE';

@@ -2,6 +2,7 @@ import { prisma } from "../config/prisma.js";
 import { UpdateUserDTO, UpdatePasswordDTO, CreateUserDTO} from "../types/userType.js";
 import bcrypt from "bcrypt";
 import { ValidationError } from "../middlewares/error.js";
+import { UserRole } from "@prisma/client";
 
 export class UserService {
 
@@ -12,6 +13,9 @@ export class UserService {
         });
         if (existingUser) {
             throw new ValidationError('Email already in use');
+        }
+        if(data.userRole == UserRole.STAFF && !data.businessId){
+            throw new ValidationError('Enter business for staff')
         }
 
         const hashedPassword = await bcrypt.hash(data.password!, 10);
@@ -90,10 +94,11 @@ export class UserService {
             throw new ValidationError('User not found');
         }
 
-        const isPasswordValid = await bcrypt.compare(newPassword, user.password);
-        if(!isPasswordValid){
+        const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+        if (!isPasswordValid) {
             throw new ValidationError('Current password is incorrect');
         }
+
 
         const hashedNewPassword = await bcrypt.hash(newPassword, 10);
         await prisma.user.update({

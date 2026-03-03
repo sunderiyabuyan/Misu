@@ -4,13 +4,14 @@ import { AuthError, ValidationError } from "../middlewares/error.js";
 
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { number } from "zod";
 
 export class AuthService {
 
-    private static generateAccessToken(userId: number, userRole: string): string {
+    private static generateAccessToken(userId: number, userRole: string, businessId?: number | null): string {
     
         return jwt.sign(
-            { userId: userId, userRole: userRole },
+            { userId, userRole, businessId  },
             process.env.JWT_ACCESS_SECRET as string,
             { expiresIn: '7d' }
         );
@@ -35,7 +36,12 @@ export class AuthService {
             throw new AuthError('Invalid email or password');
         }
 
-        const accessToken = this.generateAccessToken(user.id, user.userRole);
+        const accessToken = this.generateAccessToken(
+            user.id,
+            user.userRole,
+            user.businessId
+          );
+          
         const refreshToken = this.generateRefreshToken(user.id);
 
         const { password: _, ...userWithoutPassword } = user;
